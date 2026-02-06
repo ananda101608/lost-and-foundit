@@ -2,288 +2,296 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FoundIT - Bulletin Board</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FoundIT - Papan Barang Hilang</title>
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
 
     <style>
-        /* === 1. GLOBAL THEME === */
+        :root {
+            --bg-dark: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --primary: #3b82f6;
+        }
+
         body {
-            background-color: #0f172a; /* Slate 900 (Gelap Modern) */
-            background-image: radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.1) 0, transparent 50%), 
-                              radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.1) 0, transparent 50%);
+            background-color: var(--bg-dark);
+            background-image: radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.15) 0, transparent 50%), 
+                              radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.15) 0, transparent 50%);
             background-attachment: fixed;
             color: #f8fafc;
             font-family: 'Plus Jakarta Sans', sans-serif;
-            min-height: 100vh;
+            overflow-x: hidden;
         }
 
-        /* === 2. NAVBAR GLASS === */
         .navbar {
-            background: rgba(15, 23, 42, 0.7);
+            background: rgba(15, 23, 42, 0.9);
             backdrop-filter: blur(12px);
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            padding: 15px 0;
+            z-index: 1000;
         }
 
         .navbar-brand {
             font-weight: 800;
-            letter-spacing: -0.5px;
             background: linear-gradient(to right, #38bdf8, #818cf8);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
-        /* Tombol Lapor di Navbar (Modern Pill) */
-        .btn-lapor-nav {
-            background: linear-gradient(135deg, #3b82f6, #6366f1);
-            border: none;
-            color: white;
-            padding: 8px 24px;
-            border-radius: 50px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+        #app-container {
+            position: relative;
+            width: 100%;
+            min-height: 100vh;
         }
 
-        .btn-lapor-nav:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
-            color: white;
+        .page-view {
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+            width: 100%;
+            position: absolute;
+            top: 0; left: 0;
+            padding-top: 80px;
+            min-height: 100vh;
         }
 
-        /* === 3. SEARCH & FILTER SECTION === */
-        .search-container {
-            margin-top: 20px;
-            margin-bottom: 30px;
+        #home-view {
+            z-index: 1;
+            transform: translateX(0);
+            opacity: 1;
+        }
+        #home-view.inactive {
+            transform: scale(0.95);
+            opacity: 0.5;
+            pointer-events: none;
         }
 
-        .search-box {
-            background: rgba(30, 41, 59, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
-            padding: 8px;
-            backdrop-filter: blur(5px);
-            display: flex;
-            align-items: center;
+        #detail-view {
+            z-index: 2;
+            transform: translateX(100%);
+            opacity: 0;
+            background: var(--bg-dark);
+            position: fixed;
+            overflow-y: auto;
+            height: 100vh;
+            padding-top: 0;
+        }
+        #detail-view.active {
+            transform: translateX(0);
+            opacity: 1;
         }
 
-        .search-input {
-            background: transparent;
-            border: none;
-            color: white;
-            box-shadow: none !important;
-            font-weight: 500;
-        }
-        
-        .search-input::placeholder { color: #94a3b8; }
-
-        /* Filter Chips (Scrollable Horizontal) */
-        .filter-wrapper {
-            display: flex;
-            gap: 10px;
-            overflow-x: auto;
-            padding-bottom: 5px;
-            scrollbar-width: none; /* Hide scrollbar Firefox */
-        }
-        .filter-wrapper::-webkit-scrollbar { display: none; /* Hide scrollbar Chrome */ }
-
-        .filter-chip {
-            background: rgba(30, 41, 59, 0.5);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: #cbd5e1;
-            padding: 8px 16px;
-            border-radius: 50px;
-            font-size: 0.9rem;
-            white-space: nowrap;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-
-        .filter-chip:hover, .filter-chip.active {
-            background: #38bdf8;
-            color: #0f172a;
-            font-weight: 700;
-            border-color: #38bdf8;
-        }
-
-        /* === 4. CARD MODERN === */
         .card-item {
-            background: rgba(30, 41, 59, 0.4);
+            background: var(--card-bg);
             border: 1px solid rgba(255, 255, 255, 0.05);
             border-radius: 20px;
             overflow: hidden;
-            transition: all 0.3s ease;
-            height: 100%;
-            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s;
         }
-
-        .card-item:hover {
-            transform: translateY(-5px);
-            background: rgba(30, 41, 59, 0.8);
-            border-color: rgba(56, 189, 248, 0.3);
-            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
-        }
-
-        .card-img-wrapper {
-            height: 220px;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .card-img-top {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transition: transform 0.5s ease;
-        }
-
-        .card-item:hover .card-img-top {
-            transform: scale(1.05);
-        }
+        .card-item:active { transform: scale(0.98); }
 
         .category-badge {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: rgba(15, 23, 42, 0.6);
+            position: absolute; top: 10px; right: 10px;
+            background: rgba(0,0,0,0.6);
             backdrop-filter: blur(4px);
             color: white;
-            padding: 5px 12px;
+            padding: 4px 10px;
             border-radius: 8px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            border: 1px solid rgba(255,255,255,0.1);
+            font-size: 0.7rem;
+            border: 1px solid rgba(255,255,255,0.2);
         }
 
-        /* === 5. FORM MODAL === */
-        .modal-content {
-            background: #1e293b;
-            border: 1px solid rgba(255,255,255,0.1);
-            color: white;
-            border-radius: 20px;
+        .detail-header {
+            position: absolute; top: 15px; left: 15px; z-index: 10;
         }
-        .modal-header { border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .form-control, .form-select {
-            background: #0f172a;
-            border: 1px solid #334155;
-            color: white;
+        .btn-back {
+            background: rgba(0,0,0,0.5); border: none; color: white;
+            width: 40px; height: 40px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+        .detail-image-container {
+            width: 100%; height: 50vh; background: #000;
+        }
+        .detail-img-full {
+            width: 100%; height: 100%; object-fit: contain;
+        }
+        .detail-content {
+            background: var(--bg-dark);
+            border-radius: 25px 25px 0 0;
+            margin-top: -25px;
+            position: relative;
+            padding: 25px;
+            min-height: 60vh;
+            padding-bottom: 100px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .info-row {
+            display: flex; align-items: center; gap: 15px;
+            margin-bottom: 20px; padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .info-icon {
+            width: 45px; height: 45px;
+            background: rgba(56, 189, 248, 0.1); color: #38bdf8;
             border-radius: 12px;
-            padding: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .fixed-bottom-action {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 15px 20px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex; gap: 10px; z-index: 20;
+        }
+
+        .modal-content { background: #1e293b; color: white; border: 1px solid rgba(255,255,255,0.1); }
+        .form-control, .form-select {
+            background: #0f172a; border: 1px solid #334155; color: white;
         }
         .form-control:focus {
-            background: #0f172a;
-            color: white;
-            border-color: #38bdf8;
-            box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.1);
+            background: #0f172a; color: white; border-color: var(--primary); box-shadow: none;
         }
     </style>
 </head>
 <body>
 
-    <nav class="navbar navbar-expand-lg fixed-top shadow-sm">
-        <div class="container">
-            <a class="navbar-brand d-flex align-items-center gap-2" href="#">
-                <i class="bi bi-box-seam-fill"></i> FoundIT
-            </a>
+    <div id="app-container">
+        <div id="home-view" class="page-view">
+            <nav class="navbar navbar-expand fixed-top">
+                <div class="container">
+                    <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+                        <i class="bi bi-box-seam-fill"></i> FoundIT
+                    </a>
+                    <button class="btn btn-primary btn-sm rounded-pill px-3 fw-bold ms-auto" data-bs-toggle="modal" data-bs-target="#modalLapor">
+                        <i class="bi bi-plus-lg me-1"></i> Lapor
+                    </button>
+                </div>
+            </nav>
 
-            <button class="btn btn-lapor-nav ms-auto gap-2 d-flex align-items-center" data-bs-toggle="modal" data-bs-target="#modalLapor">
-                <i class="bi bi-plus-lg"></i>
-                <span>Lapor Barang</span>
-            </button>
-        </div>
-    </nav>
-
-    <div style="padding-top: 100px;"></div>
-
-    <div class="container search-container">
-        <div class="row justify-content-center">
-            <div class="col-md-8 col-lg-6">
-                <div class="search-box mb-3 shadow-sm">
-                    <span class="ps-3 text-secondary"><i class="bi bi-search"></i></span>
-                    <input type="text" id="searchInput" class="form-control search-input" placeholder="Cari barang hilang (contoh: Dompet, Kunci)...">
-                    <button class="btn btn-sm btn-primary rounded-pill px-4" onclick="cariBarang()">Cari</button>
+            <div class="container pb-5">
+                <div class="mb-4 mt-3">
+                    <input type="text" id="searchInput" class="form-control rounded-pill py-2 px-4" placeholder="🔍 Cari barang hilang..." onkeyup="cariBarang()">
+                    <div class="d-flex gap-2 mt-3 overflow-auto pb-2" style="scrollbar-width: none;">
+                        <button class="btn btn-sm btn-outline-secondary rounded-pill active" onclick="filterKategori('')">Semua</button>
+                        <button class="btn btn-sm btn-outline-secondary rounded-pill" onclick="filterKategori('Kunci')">Kunci</button>
+                        <button class="btn btn-sm btn-outline-secondary rounded-pill" onclick="filterKategori('Dompet')">Dompet</button>
+                        <button class="btn btn-sm btn-outline-secondary rounded-pill" onclick="filterKategori('Elektronik')">Elektronik</button>
+                        <button class="btn btn-sm btn-outline-secondary rounded-pill" onclick="filterKategori('Lainnya')">Lainnya</button>
+                    </div>
                 </div>
 
-                <div class="filter-wrapper justify-content-md-center">
-                    <div class="filter-chip active" onclick="filterKategori('')">Semua</div>
-                    <div class="filter-chip" onclick="filterKategori('Kunci')">🔑 Kunci</div>
-                    <div class="filter-chip" onclick="filterKategori('Elektronik')">📱 Gadget</div>
-                    <div class="filter-chip" onclick="filterKategori('Buku')">📚 Buku</div>
-                    <div class="filter-chip" onclick="filterKategori('Pakaian')">🧢 Pakaian</div>
-                    <div class="filter-chip" onclick="filterKategori('Lainnya')">📦 Lainnya</div>
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h6 class="fw-bold text-white m-0">Barang Ditemukan</h6>
+                    <span class="badge bg-secondary bg-opacity-25 text-light" id="totalItems">0</span>
+                </div>
+
+                <div id="container-barang" class="row g-3">
+                    <div class="col-12 text-center py-5">
+                        <div class="spinner-border text-primary"></div>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="container mb-5">
-        <div class="d-flex align-items-center mb-4">
-            <h5 class="fw-bold mb-0 text-white"><i class="bi bi-grid-fill text-primary me-2"></i>Papan Temuan</h5>
-            <span class="badge bg-secondary ms-2 bg-opacity-25 text-light" id="totalItems">0 Item</span>
-        </div>
-
-        <div id="container-barang" class="row g-4">
-            <div class="col-12 text-center py-5">
-                <div class="spinner-grow text-primary" role="status" style="width: 3rem; height: 3rem;"></div>
-                <p class="mt-3 text-muted fw-bold">Memuat data terbaru...</p>
+        <div id="detail-view" class="page-view">
+            <div class="detail-header">
+                <button onclick="tutupDetail()" class="btn-back">
+                    <i class="bi bi-arrow-left fs-5"></i>
+                </button>
             </div>
+
+            <div class="detail-image-container">
+                <img id="detail-img" src="" class="detail-img-full">
+            </div>
+
+            <div class="detail-content">
+                <span id="detail-kategori" class="badge bg-primary mb-2">Kategori</span>
+                <h3 id="detail-judul" class="fw-bold text-white mb-4">Nama Barang</h3>
+
+                <div class="info-row">
+                    <div class="info-icon"><i class="bi bi-geo-alt-fill"></i></div>
+                    <div>
+                        <small class="text-secondary d-block">Ditemukan di</small>
+                        <strong id="detail-lokasi" class="text-white">Lokasi</strong>
+                    </div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-icon"><i class="bi bi-clock-history"></i></div>
+                    <div>
+                        <small class="text-secondary d-block">Waktu Ditemukan</small>
+                        <strong id="detail-waktu" class="text-white">Waktu</strong>
+                    </div>
+                </div>
+
+                <div class="info-row border-0">
+                    <div class="info-icon"><i class="bi bi-person-fill-check"></i></div>
+                    <div>
+                        <small class="text-secondary d-block">Diamankan Oleh</small>
+                        <strong id="detail-penemu" class="text-white">Penemu</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="fixed-bottom-action" id="action-buttons">
+                </div>
         </div>
     </div>
 
-    <div class="modal fade" id="modalLapor" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content shadow-lg">
-                <div class="modal-header">
-                    <h5 class="modal-title fw-bold">📝 Form Penemuan Barang</h5>
+    <div class="modal fade" id="modalLapor" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header border-bottom-0">
+                    <h5 class="modal-title fw-bold">📝 Lapor Penemuan</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="formLapor">
                         <div class="mb-3">
-                            <label class="form-label text-secondary small fw-bold">NAMA BARANG</label>
-                            <input type="text" id="inputNama" class="form-control" placeholder="Misal: Tupperware Hitam" required>
+                            <label class="small text-secondary">FOTO BARANG (Wajib)</label>
+                            <input type="file" id="inputFoto" class="form-control" accept="image/*" required>
                         </div>
-                        
+                        <div class="mb-3">
+                            <label class="small text-secondary">NAMA BARANG</label>
+                            <input type="text" id="inputNama" class="form-control" required>
+                        </div>
                         <div class="row">
                             <div class="col-6 mb-3">
-                                <label class="form-label text-secondary small fw-bold">KATEGORI</label>
+                                <label class="small text-secondary">KATEGORI</label>
                                 <select id="inputKategori" class="form-select" required>
-                                    <option value="Lainnya">Pilih...</option>
+                                    <option value="Lainnya">Lainnya</option>
                                     <option value="Kunci">Kunci</option>
+                                    <option value="Dompet">Dompet</option>
                                     <option value="Elektronik">Elektronik</option>
-                                    <option value="Buku">Buku</option>
-                                    <option value="Pakaian">Pakaian</option>
+                                    <option value="Dokumen">Dokumen</option>
                                 </select>
                             </div>
                             <div class="col-6 mb-3">
-                                <label class="form-label text-secondary small fw-bold">LOKASI</label>
-                                <input type="text" id="inputLokasi" class="form-control" placeholder="Misal: Kantin" required>
+                                <label class="small text-secondary">LOKASI TEMU</label>
+                                <input type="text" id="inputLokasi" class="form-control" required>
                             </div>
                         </div>
-
                         <div class="mb-3">
-                            <label class="form-label text-secondary small fw-bold">FOTO BUKTI</label>
-                            <input type="file" id="inputFoto" class="form-control" accept="image/*" required>
+                            <label class="small text-secondary text-warning">WAKTU DITEMUKAN</label>
+                            <input type="datetime-local" id="inputWaktu" class="form-control" required>
                         </div>
-
+                        <div class="mb-3">
+                            <label class="small text-secondary text-warning">NAMA KAMU (PENEMU)</label>
+                            <input type="text" id="inputPenemu" class="form-control" required>
+                        </div>
                         <div class="mb-4">
-                            <label class="form-label text-secondary small fw-bold">WHATSAPP KAMU</label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-dark border-secondary text-secondary">+</span>
-                                <input type="number" id="inputWA" class="form-control" placeholder="62812xxx" required>
-                            </div>
+                            <label class="small text-secondary">WHATSAPP (Untuk dihubungi)</label>
+                            <input type="number" id="inputWA" class="form-control" placeholder="6281xxx" required>
                         </div>
-
-                        <button type="submit" class="btn btn-primary w-100 py-3 rounded-3 fw-bold">
-                            <i class="bi bi-send-fill me-2"></i> POSTING SEKARANG
-                        </button>
+                        <button type="submit" class="btn btn-primary w-100 fw-bold py-3">POSTING SEKARANG</button>
                     </form>
                 </div>
             </div>
