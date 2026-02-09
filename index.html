@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FOUNDIT-SMKN64</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        /* --- konfigurasi tema warna (dark academia) --- */
+        :root {
+            --bg-dark: #0f172a;      /* latar belakang utama */
+            --card-bg: #1e293b;      /* latar belakang kartu/modal */
+            --border-color: #334155; /* warna garis pemisah */
+            --primary: #2563eb;      /* warna utama biru */
+            --primary-dark: #1e40af; /* varian biru gelap */
+            --accent-gold: #facc15;  /* warna aksen emas */
+            --text-main: #f8fafc;    /* warna teks utama */
+            --text-muted: #94a3b8;   /* warna teks pudar */
+            --badge-found: #10b981;  /* warna badge ditemukan */
+            --badge-lost: #f43f5e;   /* warna badge hilang */
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            overflow-x: hidden;
+            padding-bottom: 90px; /* ruang untuk navigasi bawah */
+        }
+
+        /* --- gaya header atas --- */
+        .school-header {
+            background-color: rgba(15, 23, 42, 0.95);
+            border-bottom: 1px solid var(--border-color);
+            height: 65px;
+            z-index: 1050;
+        }
+
+        .brand-text {
+            font-size: 1.4rem;
+            font-weight: 800;
+            background: linear-gradient(to right, #ffffff, var(--accent-gold)); 
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-icon-header {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border-color);
+            width: 40px; height: 40px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 12px; color: white;
+            transition: all 0.2s;
+        }
+        .btn-icon-header:active { background: var(--primary); }
+
+        /* --- gaya kartu feed barang --- */
+        .card-feed {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);
+        }
+        
+        /* pembungkus gambar agar rasio tetap kotak */
+        .feed-img-wrapper {
+            position: relative; width: 100%; padding-top: 100%; background: #000;
+        }
+        .feed-img {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            object-fit: cover; opacity: 0.9;
+        }
+        
+        /* label status (hilang/ditemukan) */
+        .status-tag {
+            position: absolute; top: 10px; left: 10px;
+            padding: 5px 12px; border-radius: 30px;
+            font-size: 0.65rem; font-weight: 800; color: white;
+            backdrop-filter: blur(4px); box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            letter-spacing: 0.5px;
+        }
+        .tag-temuan { background: var(--badge-found); }
+        .tag-hilang { background: var(--badge-lost); }
+
+        /* --- area pencarian --- */
+        #searchContainer {
+            background: var(--bg-dark);
+            padding-bottom: 15px; border-bottom: 1px solid var(--border-color);
+        }
+        
+        /* tampilan jika data kosong */
+        #emptyState i { color: var(--accent-gold); font-size: 3rem; margin-bottom: 15px; }
+        #emptyState p { color: white; font-weight: 600; font-size: 1rem; }
+
+        /* --- navigasi bawah (bottom bar) --- */
+        .bottom-nav {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 92%; max-width: 450px;
+            background: rgba(30, 41, 59, 0.95); backdrop-filter: blur(16px);
+            border: 1px solid rgba(255,255,255,0.1);
+            height: 65px; border-radius: 35px;
+            display: flex; justify-content: space-evenly; align-items: center;
+            z-index: 1000; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .nav-item {
+            text-align: center; color: var(--text-muted); background: none; border: none;
+            width: 50px; transition: color 0.3s;
+        }
+        .nav-item i { font-size: 1.3rem; display: block; margin-bottom: 2px; }
+        .nav-item span { font-size: 0.65rem; display: block; }
+        .nav-item.active { color: var(--primary); }
+        
+        /* tombol tambah laporan (tengah) */
+        .nav-item-add {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark)); 
+            width: 55px; height: 55px;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            color: white !important;
+            box-shadow: 0 8px 20px -5px rgba(37, 99, 235, 0.5);
+            border: 3px solid rgba(255, 255, 255, 0.1); transform: translateY(-15px);
+            cursor: pointer; z-index: 1002;
+        }
+        .nav-item-add:active { transform: translateY(-15px) scale(0.95); }
+
+        /* --- komponen pembantu --- */
+        .form-control, .form-select { 
+            background: var(--bg-dark) !important; border: 1px solid var(--border-color); 
+            color: white !important; border-radius: 10px; padding: 10px;
+        }
+        .form-control:focus { border-color: var(--primary); box-shadow: none; }
+        
+        .modal-content { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 20px; color: white; }
+        .form-label-white { color: white; font-weight: 700; font-size: 0.8rem; margin-bottom: 5px; }
+
+        /* view detail sliding */
+        .detail-view {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-dark); z-index: 2000;
+            transform: translateX(100%); transition: transform 0.3s ease; overflow-y: auto;
+        }
+        .detail-view.active { transform: translateX(0); }
+
+        .modal-logo {
+            display: block; margin: 0 auto 10px auto;
+            width: 70px; height: auto;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+        }
+
+        .filter-section-title {
+            color: var(--accent-gold);
+            font-size: 0.75rem; font-weight: 800; letter-spacing: 1px;
+            text-transform: uppercase; margin-bottom: 8px;
+        }
+
+        /* --- gaya khusus halaman info/credits --- */
+        .group-photo-container {
+            width: 100%; aspect-ratio: 16/9; /* rasio foto lebar */
+            border-radius: 16px; overflow: hidden; margin-bottom: 25px;
+            border: 1px solid var(--border-color); position: relative;
+        }
+        .group-photo {
+            width: 100%; height: 100%; object-fit: cover;
+            transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        /* efek zoom halus saat disentuh */
+        .group-photo:active { transform: scale(1.1); }
+        
+        .member-list { list-style: none; padding: 0; margin: 0; }
+        
+        /* item anggota tim */
+        .member-item {
+            background: var(--card-bg); border: 1px solid var(--border-color);
+            border-radius: 12px; padding: 15px 20px; margin-bottom: 10px;
+            display: flex; align-items: center; gap: 15px;
+            transition: transform 0.2s;
+        }
+        .member-item i { color: var(--accent-gold); font-size: 1.1rem; }
+        .member-item span { color: white; font-weight: 600; font-size: 1rem; }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar fixed-top school-header px-3">
+        <div class="container-fluid d-flex justify-content-between align-items-center p-0">
+            <button class="btn btn-icon-header" onclick="bukaLeaderboard()">
+                <i class="bi bi-trophy-fill" style="color: var(--accent-gold);"></i>
+            </button>
+            
+            <span class="brand-text" id="pageTitle">FOUNDIT-SMKN64</span>
+            
+            <button class="btn btn-icon-header" onclick="toggleSearch()">
+                <i class="bi bi-search"></i>
+            </button>
+        </div>
+    </nav>
+
+    <div class="container" style="margin-top: 80px;">
+        
+        <div id="searchContainer" class="mb-3" style="display:none;">
+            <div class="d-flex gap-2">
+                <div class="input-group">
+                    <input type="text" id="searchInput" class="form-control border-end-0" placeholder="Cari barang..." onkeyup="cariBarang()">
+                    <button class="btn btn-outline-secondary border-start-0 bg-transparent text-white" onclick="toggleSearch()">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+                <button class="btn btn-icon-header" onclick="bukaModalFilter()">
+                    <i class="bi bi-sliders2"></i>
+                </button>
+            </div>
+            
+            <div id="activeFilterBadge" class="mt-2 d-none">
+                <span class="badge bg-primary text-white" style="font-size: 0.75rem;">Filter Aktif <i class="bi bi-check-circle ms-1"></i></span>
+                <a href="#" class="text-muted small ms-2 text-decoration-none" onclick="resetFilter()">Hapus Filter</a>
+            </div>
+        </div>
+
+        <div class="row g-3" id="container-barang"></div>
+
+        <div id="loadingState" class="text-center py-5 mt-4"><div class="spinner-border text-primary"></div></div>
+        
+        <div id="emptyState" class="text-center py-5 d-none mt-4">
+            <i class="bi bi-inbox-fill"></i>
+            <p>Belum ada laporan saat ini.</p>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <button class="nav-item active" onclick="switchTab('home', this)">
+            <i class="bi bi-house-door-fill"></i><span>Home</span>
+        </button>
+        <button class="nav-item" onclick="switchTab('temuan', this)">
+            <i class="bi bi-box-seam"></i><span>Temuan</span>
+        </button>
+        
+        <button class="nav-item-add" onclick="bukaModalLapor()">
+            <i class="bi bi-plus-lg"></i>
+        </button>
+        
+        <button class="nav-item" onclick="switchTab('hilang', this)">
+            <i class="bi bi-exclamation-circle"></i><span>Hilang</span>
+        </button>
+        
+        <button class="nav-item" onclick="bukaCredits()">
+            <i class="bi bi-info-circle-fill"></i><span>Info</span>
+        </button>
+    </div>
+
+    <div id="detail-view" class="detail-view">
+        <div class="p-3 pt-4">
+            <div class="d-flex align-items-center mb-4">
+                <button onclick="tutupDetail()" class="btn btn-icon-header me-3"><i class="bi bi-arrow-left"></i></button>
+                <h5 class="m-0 fw-bold">Detail Barang</h5>
+            </div>
+            <div class="card card-feed border-0 p-3">
+                <img id="detail-img" src="" class="rounded-4 w-100 mb-3" style="max-height: 400px; object-fit: contain; background: #000;">
+                <div class="mb-4">
+                    <span id="detail-badge" class="badge rounded-pill px-3 py-2 mb-2">STATUS</span>
+                    <h3 id="detail-judul" class="fw-bold text-white mb-2">Nama Barang</h3>
+                    <p id="detail-deskripsi" class="text-muted small">-</p>
+                </div>
+                <ul class="list-group list-group-flush rounded-4 overflow-hidden border border-color">
+                    <li class="list-group-item bg-dark border-color d-flex justify-content-between py-3 px-3">
+                        <span class="text-muted small fw-bold"><i class="bi bi-geo-alt-fill me-2 text-primary"></i>LOKASI</span>
+                        <span id="detail-lokasi" class="fw-bold text-white text-end">-</span>
+                    </li>
+                    <li class="list-group-item bg-dark border-color d-flex justify-content-between py-3 px-3">
+                        <span class="text-muted small fw-bold"><i class="bi bi-clock-fill me-2 text-warning"></i>WAKTU</span>
+                        <span id="detail-waktu" class="fw-bold text-white text-end" style="font-size: 0.8rem;">-</span>
+                    </li>
+                    <li class="list-group-item bg-dark border-color d-flex justify-content-between py-3 px-3">
+                        <span class="text-muted small fw-bold"><i class="bi bi-person-fill me-2 text-success"></i>OLEH</span>
+                        <span id="detail-user" class="fw-bold text-white text-end">-</span>
+                    </li>
+                </ul>
+                <div class="mt-4 d-grid gap-3" id="action-buttons"></div>
+            </div>
+            <div style="height: 60px;"></div>
+        </div>
+    </div>
+
+    <div id="credits-view" class="detail-view">
+        <div class="p-3 pt-4">
+            <div class="d-flex align-items-center mb-4">
+                <button onclick="tutupCredits()" class="btn btn-icon-header me-3"><i class="bi bi-arrow-left"></i></button>
+                <h5 class="m-0 fw-bold">Tentang Kami</h5>
+            </div>
+            
+            <div class="group-photo-container shadow-sm">
+                <img src="https://placehold.co/640x360/1e293b/FFF?text=Foto+Kelompok" class="group-photo" alt="Foto Kelompok">
+            </div>
+
+            <div class="text-center mb-4">
+                <h2 class="fw-bold text-white mb-1">KELOMPOK FOUNDIT</h2>
+                <p class="text-muted small">SMKN 64 JAKARTA - REKAYASA PERANGKAT LUNAK</p>
+            </div>
+
+            <div class="card card-feed border-0 p-3 mb-4">
+                <h6 class="text-white fw-bold mb-3 ms-1 text-center">ANGGOTA KELOMPOK</h6>
+                <ul class="member-list">
+                    
+                    <li class="member-item">
+                        <i class="bi bi-person-circle"></i>
+                        <span>Nama Anggota 1</span>
+                    </li>
+
+                    <li class="member-item">
+                        <i class="bi bi-person-circle"></i>
+                        <span>Nama Anggota 2</span>
+                    </li>
+
+                    <li class="member-item">
+                        <i class="bi bi-person-circle"></i>
+                        <span>Nama Anggota 3</span>
+                    </li>
+
+                    <li class="member-item">
+                        <i class="bi bi-person-circle"></i>
+                        <span>Nama Anggota 4</span>
+                    </li>
+
+                    <li class="member-item">
+                        <i class="bi bi-person-circle"></i>
+                        <span>Nama Anggota 5</span>
+                    </li>
+
+                    <li class="member-item">
+                        <i class="bi bi-person-circle"></i>
+                        <span>Nama Anggota 6</span>
+                    </li>
+
+                </ul>
+            </div>
+
+            <div class="text-center pb-5">
+                <small class="text-muted">Dibuat tahun 2026</small>
+            </div>
+            
+            <div style="height: 60px;"></div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalFilter" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title fw-bold">Filter Pencarian</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formFilter" onsubmit="terapkanFilter(event)">
+                        <div class="mb-3">
+                            <p class="filter-section-title">📂 KATEGORI</p>
+                            <select id="filterKategoriSelect" class="form-select">
+                                <option value="">Semua Kategori</option>
+                                <option value="Kunci">Kunci</option>
+                                <option value="Dompet">Dompet</option>
+                                <option value="Elektronik">Gadget</option>
+                                <option value="Dokumen">Dokumen</option>
+                                <option value="Aksesoris">Aksesoris</option>
+                                <option value="Alat Tulis">Alat Tulis</option>
+                                <option value="Lainnya">Lainnya</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <p class="filter-section-title">📍 LOKASI</p>
+                            <select id="filterLokasi" class="form-select">
+                                <option value="">Semua Lokasi</option>
+                                <option value="Lab RPL">Area Lab RPL</option>
+                                <option value="Lab DKV">Area Lab DKV</option>
+                                <option value="Kantin">Kantin</option>
+                                <option value="Masjid">Masjid</option>
+                                <option value="Perpustakaan">Perpustakaan</option>
+                                <option value="Parkiran">Parkiran</option>
+                                <option value="Aula">Aula</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <p class="filter-section-title">📅 TANGGAL</p>
+                            <div class="row g-2">
+                                <div class="col-6"><small class="text-muted d-block mb-1">Dari</small><input type="date" id="filterDateFrom" class="form-control"></div>
+                                <div class="col-6"><small class="text-muted d-block mb-1">Sampai</small><input type="date" id="filterDateTo" class="form-control"></div>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <p class="filter-section-title">🔃 URUTKAN</p>
+                            <select id="filterSort" class="form-select">
+                                <option value="newest">Terbaru (Default)</option>
+                                <option value="oldest">Terlama</option>
+                            </select>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary fw-bold py-2 rounded-3">TERAPKAN FILTER</button>
+                            <button type="button" class="btn btn-outline-secondary py-2 rounded-3 text-white" onclick="resetFilter()">RESET</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalLapor" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body pt-0">
+                    <img src="https://cdn-icons-png.flaticon.com/512/2997/2997235.png" class="modal-logo" alt="Logo Sekolah">
+                    <h5 class="text-center fw-bold mb-1">Formulir Laporan</h5>
+                    <p class="text-center text-muted small mb-4">SMKN 64 JAKARTA</p>
+                    
+                    <form id="formLapor">
+                        <div class="mb-3">
+                            <select id="inputTipe" class="form-select text-center fw-bold py-3" style="border: 2px solid var(--primary);" required onchange="cekTipeLaporan()">
+                                <option value="TEMUAN">📦 SAYA MENEMUKAN BARANG</option>
+                                <option value="KEHILANGAN">🆘 SAYA KEHILANGAN BARANG</option>
+                            </select>
+                        </div>
+                        <div class="mb-3"><label class="form-label-white" id="labelFoto">FOTO</label><input type="file" id="inputFoto" class="form-control" accept="image/*"></div>
+                        <div class="mb-3"><label class="form-label-white">NAMA BARANG</label><input type="text" id="inputNama" class="form-control" required></div>
+                        <div class="mb-3"><label class="form-label-white">DESKRIPSI</label><textarea id="inputDeskripsi" class="form-control" rows="2"></textarea></div>
+                        <div class="row">
+                            <div class="col-6 mb-3"><label class="form-label-white">KATEGORI</label><select id="inputKategori" class="form-select" required><option value="Lainnya">Lainnya</option><option value="Kunci">Kunci</option><option value="Dompet">Dompet</option><option value="Elektronik">Gadget</option><option value="Dokumen">Dokumen</option><option value="Aksesoris">Aksesoris</option><option value="Alat Tulis">Alat Tulis</option></select></div>
+                            <div class="col-6 mb-3"><label class="form-label-white">LOKASI</label><input class="form-control" list="lokasiOptions" id="inputLokasi" required placeholder="Pilih..."><datalist id="lokasiOptions"><option value="Lab RPL 1"><option value="Lab RPL 2"><option value="Lab DKV 1"><option value="Lab DKV 2"><option value="Kantin"><option value="Masjid"><option value="Perpustakaan"><option value="Parkiran"></datalist></div>
+                        </div>
+                        <div class="mb-3"><label class="form-label-white">WAKTU</label><input type="datetime-local" id="inputWaktu" class="form-control" required></div>
+                        <div class="row">
+                            <div class="col-6 mb-3"><label class="form-label-white">NAMA KAMU</label><input type="text" id="inputPenemu" class="form-control" required></div>
+                            <div class="col-6 mb-3"><label class="form-label-white">KELAS</label><input type="text" id="inputKelas" class="form-control" placeholder="X RPL 1"></div>
+                        </div>
+                        <div class="mb-4"><label class="form-label-white">WHATSAPP</label><input type="number" id="inputWA" class="form-control" required placeholder="08xxxx"></div>
+                        <button type="submit" class="btn btn-primary w-100 fw-bold py-3 rounded-4">KIRIM LAPORAN</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalLeaderboard" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title fw-bold text-warning">Top Pahlawan</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body p-0" id="leaderboardBody"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
